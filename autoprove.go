@@ -13,7 +13,6 @@ const phoneSetPath string = "/usr/local/voip/iphone/"
 
 var phoneType = []string{"x3s", "c58p", "168ge"}
 
-
 func ReadExcelData(column string) []string {
 
 	var data []string
@@ -62,10 +61,11 @@ func ReadExcelData(column string) []string {
 					if strings.Contains(strings.ToLower(excelData), pType) {
 						typeFound = true
 						data = append(data, pType)
+						continue
 					}
 				}
 				if typeFound == false {
-					fmt.Println("Check The Phone Type Had not provider")
+					fmt.Println("Check The Phone Type had not provider")
 					data = append(data, "notype")
 				}
 			}
@@ -79,6 +79,23 @@ func ReadExcelData(column string) []string {
 //func ReadExcelCellData() string {
 
 //}
+
+func GetPhoneSetValue(index int, setPhone string) (string, string) {
+	var pSetValue string
+	xlsx, err := excelize.OpenFile("/tmp/Extensions_template.xlsx")
+	if err != nil {
+		fmt.Println(err)
+	}
+	line := strings.Split(strings.ToUpper(strings.Join(strings.Split(setPhone, ":")[1:2], "")), ",")
+	for _, data := range line {
+		xlsSetValue, err := xlsx.GetCellValue(xlsx.GetSheetMap()[1], strings.Join(strings.Fields(data), "")+strconv.Itoa(index))
+		if err != nil {
+			fmt.Println(err)
+		}
+		pSetValue = pSetValue + strings.Replace(data, strings.Join(strings.Fields(data), ""), xlsSetValue, -1)
+	}
+	return strings.Join(strings.Split(setPhone, ":")[:1], ""), pSetValue
+}
 
 func readLines(path string) ([]string, error) {
 	file, err := os.Open(path)
@@ -111,41 +128,61 @@ func writeLines(lines []string, path string) error {
 
 func main() {
 
+	var config, setPhone []string
+
 	xlsIsMobile := ReadExcelData("A")
 	xlsAutoprov := ReadExcelData("K")
 	xlsPhoneType := ReadExcelData("AY")
-	xlsmac := ReadExcelData("AZ")
+	//	xlsMac := ReadExcelData("AZ")
 	xlsSetPhoneTemplate := ReadExcelData("BA")
-	xlsSetPhoneBindIp := ReadExcelData("BB")
+	//	xlsSetPhoneBindIp := ReadExcelData("BB")
 
-	//        for i := 0; i < len(xlsIsMobile); i++
+	//    for i := 0; i < len(xlsIsMobile); i++
 
 	for i, isMobile := range xlsIsMobile {
 		if isMobile == "no" && xlsAutoprov[i] == "yes" && xlsPhoneType[i] != "notype" {
-			fmt.Println(i, isMobile, xlsAutoprov[i], xlsmac[i], xlsPhoneType[i], xlsSetPhoneTemplate[i], xlsSetPhoneBindIp[i])
-
-
 			if i == 0 || !(xlsPhoneType[i] == xlsPhoneType[i-1] && xlsSetPhoneTemplate[i] == xlsSetPhoneTemplate[i-1]) && xlsAutoprov[i-1] == "yes" && xlsPhoneType[i-1] != "notype" {
-
-				config, err := readLines(phoneSetPath + xlsPhoneType[i] + "/" + xlsSetPhoneTemplate[i])
+				config = config[:0]
+				lines, err := readLines(phoneSetPath + xlsPhoneType[i] + "/" + xlsSetPhoneTemplate[i])
 				if err != nil {
 					fmt.Printf("readLines: %s", err)
 				}
-				fmt.Printf("%s\n type= %T",config,config)
+				for _, line := range lines {
+					config = append(config, line)
+				}
 			}
 
 			if i == 0 || !(xlsPhoneType[i] == xlsPhoneType[i-1]) && xlsAutoprov[i-1] == "yes" && xlsPhoneType[i-1] != "notype" {
-
-				setPhone, err := readLines(phoneSetPath + xlsPhoneType[i] + "/setphone")
+				setPhone = setPhone[:0]
+				lines, err := readLines(phoneSetPath + xlsPhoneType[i] + "/setphone")
 				if err != nil {
 					fmt.Printf("readLines: %s", err)
 				}
 
-				fmt.Println(setPhone[6])
+				for _, line := range lines {
+					setPhone = append(setPhone, line)
+				}
 			}
 		}
-
+		for _, item := range setPhone {
+			var configTargetItem int
+			phoneSetItem, phoneSetValue := GetPhoneSetValue(i+3, item)
+			typeFound := false
+			for i, configItem := range config {
+				if strings.Contains(configItem, phoneSetItem) {
+					typeFound = true
+					configTargetItem = i
+					continue
+				}
+			}
+			if typeFound == false {
+				fmt.Println("Search no mach with setphone item , check the item is correct")
+			}
+			config[configTargetItem]=strings.Join(strings.SplitAfter(config[configTargetItem],":")[:1],"") + phoneSetValue
+		}
+		    for _, pt := range config{
+				fmt.Printf("%T   %T\n",pt,config)
+			}
 	}
-
 
 }
