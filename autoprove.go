@@ -5,20 +5,24 @@ import (
 	"fmt"
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const phoneSetPath string = "/usr/local/voip/iphone/"
 
 var phoneType = []string{"x3s", "c58p", "168ge"}
+var xlsPhoneType,
+	xlsMac  []string
 
 func ReadExcelData(column string) []string {
 
 	var data []string
 
 	//固定讀取上傳後的execl檔案
-	xlsx, err := excelize.OpenFile("/tmp/Extensions_template.xlsx")
+	xlsx, err := excelize.OpenFile("/tmp/Extensions_data.xlsx")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(0)
@@ -76,13 +80,10 @@ func ReadExcelData(column string) []string {
 	return data
 }
 
-//func ReadExcelCellData() string {
-
-//}
-
 func GetPhoneSetValue(index int, setPhone string) (string, string) {
+//	fmt.Printf("phonetype %s  index [%d]\n",xlsPhoneType[index-1],index-1)
 	var pSetValue string
-	xlsx, err := excelize.OpenFile("/tmp/Extensions_template.xlsx")
+	xlsx, err := excelize.OpenFile("/tmp/Extensions_data.xlsx")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -126,18 +127,33 @@ func writeLines(lines []string, path string) error {
 	return w.Flush()
 }
 
+func spinner(delay time.Duration) {
+	for {
+		for _,r := range `-\|/` {
+			fmt.Printf("\r%c ",r)
+			time.Sleep(delay)
+		
+		}
+	}
+}
+
 func main() {
 
 	var config, setPhone []string
-
+	go spinner(100 * time.Millisecond)
 	xlsIsMobile := ReadExcelData("A")
 	xlsAutoprov := ReadExcelData("K")
-	xlsPhoneType := ReadExcelData("AY")
-	//	xlsMac := ReadExcelData("AZ")
+	xlsPhoneType = ReadExcelData("AY")
+	xlsMac = ReadExcelData("AZ")
 	xlsSetPhoneTemplate := ReadExcelData("BA")
 	//	xlsSetPhoneBindIp := ReadExcelData("BB")
 
-	//    for i := 0; i < len(xlsIsMobile); i++
+	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	tftpOutPutPath := strings.Join(strings.Fields(string(path)), "") + "/"
 
 	for i, isMobile := range xlsIsMobile {
 		if isMobile == "no" && xlsAutoprov[i] == "yes" && xlsPhoneType[i] != "notype" {
@@ -178,11 +194,21 @@ func main() {
 			if typeFound == false {
 				fmt.Println("Search no mach with setphone item , check the item is correct")
 			}
-			config[configTargetItem]=strings.Join(strings.SplitAfter(config[configTargetItem],":")[:1],"") + phoneSetValue
+			config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], ":")[:1], "") + phoneSetValue
 		}
-		    for _, pt := range config{
-				fmt.Printf("%T   %T\n",pt,config)
+		switch xlsPhoneType[i] {
+		case "x3s", "c58p":
+
+			if err := writeLines(config, tftpOutPutPath+xlsMac[i]+".cfg"); err != nil {
+				fmt.Println("Writeconfigfile Error : ", err)
 			}
+		case "168ge":
+			if err := writeLines(config, "/home/demo/public_html/DPH168GE/"+strings.ToUpper(xlsMac[i])+".dat"); err != nil {
+				fmt.Println("Writeconfigfile Error : ", err)
+
+			}
+		}
+		
 	}
 
 }
