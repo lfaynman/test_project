@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const phoneSetPath string = "/usr/local/voip/iphone/"
+const phoneSetPath string = "/usr/local/voip/ipphone/"
 
 var phoneType = []string{"x3s", "c58p", "168ge"}
 var xlsPhoneType,
