@@ -15,7 +15,7 @@ const phoneSetPath string = "/usr/local/voip/ipphone/"
 
 var phoneType = []string{"x3s", "c58p", "168ge"}
 var xlsPhoneType,
-	xlsMac  []string
+	xlsMac []string
 
 func ReadExcelData(column string) []string {
 
@@ -81,7 +81,7 @@ func ReadExcelData(column string) []string {
 }
 
 func GetPhoneSetValue(index int, setPhone string) (string, string) {
-//	fmt.Printf("phonetype %s  index [%d]\n",xlsPhoneType[index-1],index-1)
+	//	fmt.Printf("phonetype %s  index [%d]\n",xlsPhoneType[index-1],index-1)
 	var pSetValue string
 	xlsx, err := excelize.OpenFile("/tmp/Extensions_data.xlsx")
 	if err != nil {
@@ -129,10 +129,10 @@ func writeLines(lines []string, path string) error {
 
 func spinner(delay time.Duration) {
 	for {
-		for _,r := range `-\|/` {
-			fmt.Printf("\r%c ",r)
+		for _, r := range `-\|/` {
+			fmt.Printf("\r%c ", r)
 			time.Sleep(delay)
-		
+
 		}
 	}
 }
@@ -154,7 +154,8 @@ func main() {
 		os.Exit(1)
 	}
 	tftpOutPutPath := strings.Join(strings.Fields(string(path)), "") + "/"
-
+	command := "/bin/rm -f " + tftpOutPutPath + "*"
+	exec.Command("/bin/sh", "-c", command).Output()
 	for i, isMobile := range xlsIsMobile {
 		if isMobile == "no" && xlsAutoprov[i] == "yes" && xlsPhoneType[i] != "notype" {
 			if i == 0 || !(xlsPhoneType[i] == xlsPhoneType[i-1] && xlsSetPhoneTemplate[i] == xlsSetPhoneTemplate[i-1]) && xlsAutoprov[i-1] == "yes" && xlsPhoneType[i-1] != "notype" {
@@ -203,12 +204,13 @@ func main() {
 				fmt.Println("Writeconfigfile Error : ", err)
 			}
 		case "168ge":
+			exec.Command("/bin/sh", "-c", `mkdir -p /home/demo/public_html/DPH168GE/`).Output()
 			if err := writeLines(config, "/home/demo/public_html/DPH168GE/"+strings.ToUpper(xlsMac[i])+".dat"); err != nil {
 				fmt.Println("Writeconfigfile Error : ", err)
 
 			}
 		}
-		
+
 	}
 
 }
