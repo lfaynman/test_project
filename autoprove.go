@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -22,7 +21,6 @@ var supportPhoneTypes []string
 
 func main() {
 	orignalTime := time.Now().UnixNano()
-	var wg sync.WaitGroup
 	var config, setPhone []string
 	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
 	if err != nil {
@@ -51,81 +49,76 @@ func main() {
 	supportPhoneTypes = getSupportPhoneTypes(phoneSetPath)
 	phoneData = makeFormateRegular(phoneData[2:], isMobile, isUseAutoProvisioning, usePhoneType, macAddress)
 
-	wg.Add(1)
-	go func() {
-		for i, _ := range phoneData {
-			if phoneData[i][usePhoneType] == "unknowtype" || phoneData[i][isUseAutoProvisioning] == "no" || phoneData[i][isMobile] == "yes" {
-				continue
+	for i, _ := range phoneData {
+		if phoneData[i][usePhoneType] == "unknowtype" || phoneData[i][isUseAutoProvisioning] == "no" || phoneData[i][isMobile] == "yes" {
+			continue
+		}
+		if i == 0 || phoneData[i][usePhoneType] != phoneData[i][usePhoneType-1] || phoneData[i][useSetPhoneTemplate] != phoneData[i][useSetPhoneTemplate-1] {
+			config = config[:0]
+			configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
+			if err != nil {
+				writeToLog(err.Error() + "\n")
 			}
-			if i == 0 || phoneData[i][usePhoneType] != phoneData[i][usePhoneType-1] || phoneData[i][useSetPhoneTemplate] != phoneData[i][useSetPhoneTemplate-1] {
-				config = config[:0]
-				configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
-				if err != nil {
-					writeToLog(err.Error() + "\n")
-				}
-				for _, cline := range configlines {
-					config = append(config, cline)
-				}
-				setPhone = setPhone[:0]
-				setPhonelines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
-				if err != nil {
-					writeToLog(err.Error() + "\n")
-				}
-				for _, sline := range setPhonelines {
-					if strings.Join(strings.Fields(sline), "") == "" {
-						continue
-					}
-					setPhone = append(setPhone, sline)
-				}
+			for _, cline := range configlines {
+				config = append(config, cline)
 			}
-			for _, item := range setPhone {
-				var configTargetItem int
-				var phoneSetValue, splitCharacter string
-				setPhoneSearchString := strings.Join(strings.Split(item, ":")[:1], "")
-				setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
-				for _, data := range setPhoneData {
-					if len(phoneData[i]) <= covertExcelItemToArrayItem(strings.Join(strings.Fields(data), "")) {
-						writeToLog(" ERROR : Set config error : " + item + "   The value [ " + data + " ]  is out of Execel file DATA range\n")
-						os.Exit(0)
-					}
-					phoneSetValue = phoneSetValue + strings.Replace(data, strings.Join(strings.Fields(data), ""), phoneData[i][covertExcelItemToArrayItem(strings.Join(strings.Fields(data), ""))], -1)
-				}
-				typeFound := false
-				for i, configItem := range config {
-					if strings.Contains(configItem, setPhoneSearchString) {
-						typeFound = true
-						configTargetItem = i
-						continue
-					}
-				}
-				if typeFound == false {
-					writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct\n")
-				}
-				for _, c := range splitCharacterSupport {
-					if strings.Contains(config[len(config)/2], c) {
-						splitCharacter = c
-						break
-					}
-				}
-				config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], splitCharacter)[:1], "") + phoneSetValue
+			setPhone = setPhone[:0]
+			setPhonelines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
+			if err != nil {
+				writeToLog(err.Error() + "\n")
 			}
-
-			phoneTypefirstCharacter := phoneData[i][usePhoneType][:1]
-			fileNameExtension := "." + strings.Join(strings.Split(phoneData[i][usePhoneType], ".")[1:2], "")
-			switch {
-			case "A" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "Z", "0" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "9":
-				if err := writeLines(config, tftpOutPutPath+strings.ToUpper(phoneData[i][macAddress])+fileNameExtension); err != nil {
-					writeToLog("Writeconfigfile Error : " + err.Error() + "\n")
+			for _, sline := range setPhonelines {
+				if strings.Join(strings.Fields(sline), "") == "" {
+					continue
 				}
-			default:
-				if err := writeLines(config, tftpOutPutPath+phoneData[i][macAddress]+fileNameExtension); err != nil {
-					writeToLog("Writeconfigfile Error : " + err.Error() + "\n")
-				}
+				setPhone = append(setPhone, sline)
 			}
 		}
-		defer wg.Done()
-	}()
-	wg.Wait()
+		for _, item := range setPhone {
+			var configTargetItem int
+			var phoneSetValue, splitCharacter string
+			setPhoneSearchString := strings.Join(strings.Split(item, ":")[:1], "")
+			setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
+			for _, data := range setPhoneData {
+				if len(phoneData[i]) <= covertExcelItemToArrayItem(strings.Join(strings.Fields(data), "")) {
+					writeToLog(" ERROR : Set config error : " + item + "   The value [ " + data + " ]  is out of Execel file DATA range\n")
+					os.Exit(0)
+				}
+				phoneSetValue = phoneSetValue + strings.Replace(data, strings.Join(strings.Fields(data), ""), phoneData[i][covertExcelItemToArrayItem(strings.Join(strings.Fields(data), ""))], -1)
+			}
+			typeFound := false
+			for i, configItem := range config {
+				if strings.Contains(configItem, setPhoneSearchString) {
+					typeFound = true
+					configTargetItem = i
+					continue
+				}
+			}
+			if typeFound == false {
+				writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct\n")
+			}
+			for _, c := range splitCharacterSupport {
+				if strings.Contains(config[len(config)/2], c) {
+					splitCharacter = c
+					break
+				}
+			}
+			config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], splitCharacter)[:1], "") + phoneSetValue
+		}
+
+		phoneTypefirstCharacter := phoneData[i][usePhoneType][:1]
+		fileNameExtension := "." + strings.Join(strings.Split(phoneData[i][usePhoneType], ".")[1:2], "")
+		switch {
+		case "A" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "Z", "0" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "9":
+			if err := writeLines(config, tftpOutPutPath+strings.ToUpper(phoneData[i][macAddress])+fileNameExtension); err != nil {
+				writeToLog("Writeconfigfile Error : " + err.Error() + "\n")
+			}
+		default:
+			if err := writeLines(config, tftpOutPutPath+phoneData[i][macAddress]+fileNameExtension); err != nil {
+				writeToLog("Writeconfigfile Error : " + err.Error() + "\n")
+			}
+		}
+	}
 	writeToLog("Total " + strconv.Itoa(len(phoneData)) + "  Execel items maked.")
 	writeToLog("Total RunTime is  " + strconv.Itoa(int((time.Now().UnixNano()-orignalTime)/1000000)) + "  millisec.")
 }
