@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/360EntSecGroup-Skylar/excelize"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -15,7 +16,8 @@ import (
 
 const phoneSetPath string = "/usr/local/voip/ipphone/"
 
-var supportPhoneType = []string{"x3s", "c58p", "168ge"}
+var splitCharacterSupport = []string{"=", ":"}
+var supportPhoneTypes []string
 
 func main() {
 	orignalTime := time.Now().Unix()
@@ -44,6 +46,7 @@ func main() {
 	usePhoneType := covertExcelItemToArrayItem("AY")
 	macAddress := covertExcelItemToArrayItem("AZ")
 	useSetPhoneTemplate := covertExcelItemToArrayItem("BA")
+	supportPhoneTypes = getSupportPhoneTypes(phoneSetPath)
 	phoneData = makeFormateRegular(phoneData[2:], isMobile, isUseAutoProvisioning, usePhoneType, macAddress)
 
 	/*	ch := make(chan string, len(supportPhoneType))
@@ -58,33 +61,34 @@ func main() {
 	*/
 
 	for i, _ := range phoneData {
-		if phoneData[i][isMobile] == "no" && phoneData[i][isUseAutoProvisioning] == "yes" && phoneData[i][usePhoneType] != "unknowtype" {
-			if i == 0 || !(phoneData[i][usePhoneType] == phoneData[i][usePhoneType-1] && phoneData[i][useSetPhoneTemplate] == phoneData[i][useSetPhoneTemplate-1]) && phoneData[i][isUseAutoProvisioning-1] == "yes" && phoneData[i][usePhoneType-1] != "unknowtype" {
-				config = config[:0]
-				lines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
-				if err != nil {
-					writeToLog("readLines: %s" + err.Error())
-				}
-				for _, line := range lines {
-					config = append(config, line)
-				}
+		if phoneData[i][usePhoneType] == "unknowtype" || phoneData[i][isUseAutoProvisioning] == "no" || phoneData[i][isMobile] == "yes" {
+			continue
+		}
+		if i == 0 || phoneData[i][usePhoneType] != phoneData[i][usePhoneType-1] || phoneData[i][useSetPhoneTemplate] != phoneData[i][useSetPhoneTemplate-1] {
+			config = config[:0]
+			configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
+			if err != nil {
+				writeToLog(err.Error())
+			}
+			for _, cline := range configlines {
+				config = append(config, cline)
+			}
+			setPhone = setPhone[:0]
+			setPhonelines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
+			if err != nil {
+				writeToLog(err.Error())
 			}
 
-			if i == 0 || !(phoneData[i][useSetPhoneTemplate] == phoneData[i][useSetPhoneTemplate-1]) && phoneData[i][isUseAutoProvisioning-1] == "yes" && phoneData[i][usePhoneType-1] != "unknowtype" {
-				setPhone = setPhone[:0]
-				lines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
-				if err != nil {
-					writeToLog("readLines: %s" + err.Error())
+			for _, sline := range setPhonelines {
+				if strings.Join(strings.Fields(sline), "") == "" {
+					continue
 				}
-
-				for _, line := range lines {
-					setPhone = append(setPhone, line)
-				}
+				setPhone = append(setPhone, sline)
 			}
 		}
 		for _, item := range setPhone {
 			var configTargetItem int
-			var phoneSetValue string
+			var phoneSetValue, splitCharacter string
 			setPhoneSearchString := strings.Join(strings.Split(item, ":")[:1], "")
 			setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
 			for _, data := range setPhoneData {
@@ -99,20 +103,26 @@ func main() {
 				}
 			}
 			if typeFound == false {
-				writeToLog("The setPhone file Search no mach with setphone item , check the item is correct")
+				writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct")
 			}
-			config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], ":")[:1], "") + phoneSetValue
+			for _, c := range splitCharacterSupport {
+				if strings.Contains(config[len(config)/2], c) {
+					splitCharacter = c
+					break
+				}
+			}
+			config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], splitCharacter)[:1], "") + phoneSetValue
 		}
 
-		switch phoneData[i][usePhoneType] {
-		case "168ge":
-			exec.Command("/bin/sh", "-c", `mkdir -p /home/demo/public_html/DPH168GE/`).Output()
-			if err := writeLines(config, "/home/demo/public_html/DPH168GE/"+strings.ToUpper(phoneData[i][macAddress])+".dat"); err != nil {
+		phoneTypefirstCharacter := phoneData[i][usePhoneType][:1]
+		fileNameExtension := "." + strings.Join(strings.Split(phoneData[i][usePhoneType], ".")[1:2], "")
+		switch {
+		case "A" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "Z", "0" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "9":
+			if err := writeLines(config, tftpOutPutPath+strings.ToUpper(phoneData[i][macAddress])+fileNameExtension); err != nil {
 				writeToLog("Writeconfigfile Error : " + err.Error())
-
 			}
 		default:
-			if err := writeLines(config, tftpOutPutPath+phoneData[i][macAddress]+".cfg"); err != nil {
+			if err := writeLines(config, tftpOutPutPath+phoneData[i][macAddress]+fileNameExtension); err != nil {
 				writeToLog("Writeconfigfile Error : " + err.Error())
 			}
 		}
@@ -133,6 +143,24 @@ func covertExcelItemToArrayItem(s string) int {
 	return (sum - 1)
 }
 
+func getSupportPhoneTypes(path string) []string {
+	var phoneType []string
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		fName, err := os.Stat(path + f.Name())
+		if err != nil {
+			writeToLog(err.Error())
+		}
+		if fName.Mode().IsDir() {
+			phoneType = append(phoneType, fName.Name())
+		}
+	}
+	return phoneType
+}
+
 func makeFormateRegular(phoneData [][]string, isMobile, isUseAutoProvisioning, usePhoneType, macAddress int) [][]string {
 	replacer := strings.NewReplacer(":", "", "-", "")
 	for i, _ := range phoneData {
@@ -140,15 +168,15 @@ func makeFormateRegular(phoneData [][]string, isMobile, isUseAutoProvisioning, u
 		phoneData[i][isMobile] = strings.ToLower(phoneData[i][isMobile])
 		phoneData[i][isUseAutoProvisioning] = strings.ToLower(phoneData[i][isUseAutoProvisioning])
 		typeFound := false
-		for _, pType := range supportPhoneType {
-			if strings.Contains(strings.ToLower(phoneData[i][usePhoneType]), pType) {
+		for _, pType := range supportPhoneTypes {
+			if strings.Contains(strings.ToLower(phoneData[i][usePhoneType]), strings.ToLower(strings.Join(strings.Split(pType, ".")[:1], ""))) {
 				typeFound = true
 				phoneData[i][usePhoneType] = pType
 				continue
 			}
 		}
 		if typeFound == false {
-			writeToLog("The execl row " + strconv.Itoa(i+3) + " phone type is  '" + phoneData[i][usePhoneType] + "'  the type not yet suppert so check The Phone Type\n" + strconv.Itoa(i+3) + " " + strings.Join(phoneData[i], " "))
+			writeToLog("[The execl row '" + strconv.Itoa(i+3) + "']  phone type is  '" + phoneData[i][usePhoneType] + "'  the type not yet suppert so check The Phone Type\n [" + strconv.Itoa(i+3) + "] " + strings.Join(phoneData[i], " "))
 			phoneData[i][usePhoneType] = "unknowtype"
 		}
 	}
@@ -161,7 +189,6 @@ func readLines(path string) ([]string, error) {
 		return nil, err
 	}
 	defer file.Close()
-
 	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -176,7 +203,6 @@ func writeLines(lines []string, path string) error {
 		return err
 	}
 	defer file.Close()
-
 	w := bufio.NewWriter(file)
 	for _, line := range lines {
 		fmt.Fprintln(w, line)
