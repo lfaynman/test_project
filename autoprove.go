@@ -93,7 +93,7 @@ func main() {
 			setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
 			for _, data := range setPhoneData {
 				if len(phoneData[i]) <= covertExcelItemToArrayItem(strings.Join(strings.Fields(data), "")) {
-					writeToLog(" Set config error :  " + item + "   The value [ " + data + " ]  is out of Execel file DATA range\n")
+					writeToLog(" ERROR : Set config error : " + item + "   The value [ " + data + " ]  is out of Execel file DATA range\n")
 					os.Exit(0)
 				}
 				phoneSetValue = phoneSetValue + strings.Replace(data, strings.Join(strings.Fields(data), ""), phoneData[i][covertExcelItemToArrayItem(strings.Join(strings.Fields(data), ""))], -1)
