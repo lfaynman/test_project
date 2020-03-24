@@ -149,7 +149,7 @@ func covertExcelItemToArrayItem(s string) int {
 
 func getSupportPhoneTypes(path string) []string {
 	var phoneType []string
-	var runtimeerrbit int = 0
+	var runTimeErrBit int = 0
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Fatal(err)
@@ -162,15 +162,15 @@ func getSupportPhoneTypes(path string) []string {
 		if fName.Mode().IsDir() {
 			if !(strings.Contains(fName.Name(), ".")) {
 				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  not include file extensions")
-				runtimeerrbit++
+				runTimeErrBit++
 			} else if strings.Join(strings.Split(fName.Name(), ".")[1:2], "") == "" {
 				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  file extensions is empty")
-				runtimeerrbit++
+				runTimeErrBit++
 			}
 			phoneType = append(phoneType, fName.Name())
 		}
 	}
-	if runtimeerrbit > 0 {
+	if runTimeErrBit > 0 {
 		os.Exit(0)
 	}
 	return phoneType
