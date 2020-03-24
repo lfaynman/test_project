@@ -78,7 +78,6 @@ func main() {
 			if err != nil {
 				writeToLog(err.Error() + "\n")
 			}
-
 			for _, sline := range setPhonelines {
 				if strings.Join(strings.Fields(sline), "") == "" {
 					continue
@@ -161,10 +160,10 @@ func getSupportPhoneTypes(path string) []string {
 		}
 		if fName.Mode().IsDir() {
 			if !(strings.Contains(fName.Name(), ".")) {
-				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  not include file extensions")
+				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  not include file name extension")
 				runTimeErrBit++
 			} else if strings.Join(strings.Split(fName.Name(), ".")[1:2], "") == "" {
-				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  file extensions is empty")
+				writeToLog(" ERROR : The Direct  [ " + fName.Name() + " ]  file name extension is empty")
 				runTimeErrBit++
 			}
 			phoneType = append(phoneType, fName.Name())
