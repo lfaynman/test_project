@@ -24,7 +24,7 @@ func main() {
 	var config, setPhone []string
 	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
 	if err != nil {
-		writeToLog(err.Error())
+		writeToLog(err.Error()+"\n")
 		os.Exit(1)
 	}
 	tftpOutPutPath := strings.Join(strings.Fields(string(path)), "") + "/"
@@ -33,12 +33,12 @@ func main() {
 	exec.Command("/bin/sh", "-c", "true > /usr/local/voip/ipphone/autoprovlog.log").Output()
 	f, err := excelize.OpenFile("/tmp/Extensions_data.xlsx")
 	if err != nil {
-		writeToLog(err.Error())
+		writeToLog(err.Error()+"\n")
 		return
 	}
 	phoneData, err := f.GetRows(f.GetSheetMap()[1])
 	if err != nil {
-		writeToLog(err.Error())
+		writeToLog(err.Error()+"\n")
 		return
 	}
 	isMobile := covertExcelItemToArrayItem("A")
@@ -68,7 +68,7 @@ func main() {
 			config = config[:0]
 			configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
 			if err != nil {
-				writeToLog(err.Error())
+				writeToLog(err.Error()+"\n")
 			}
 			for _, cline := range configlines {
 				config = append(config, cline)
@@ -76,7 +76,7 @@ func main() {
 			setPhone = setPhone[:0]
 			setPhonelines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
 			if err != nil {
-				writeToLog(err.Error())
+				writeToLog(err.Error()+"\n")
 			}
 
 			for _, sline := range setPhonelines {
@@ -92,6 +92,10 @@ func main() {
 			setPhoneSearchString := strings.Join(strings.Split(item, ":")[:1], "")
 			setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
 			for _, data := range setPhoneData {
+				if len(phoneData[i]) <= covertExcelItemToArrayItem(strings.Join(strings.Fields(data), "")){
+					writeToLog(" Set config error :  "+item+"   The value [ "+data+" ]  is out of Execel file DATA range\n")
+					os.Exit(0)
+				}
 				phoneSetValue = phoneSetValue + strings.Replace(data, strings.Join(strings.Fields(data), ""), phoneData[i][covertExcelItemToArrayItem(strings.Join(strings.Fields(data), ""))], -1)
 			}
 			typeFound := false
@@ -103,7 +107,7 @@ func main() {
 				}
 			}
 			if typeFound == false {
-				writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct")
+				writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct\n")
 			}
 			for _, c := range splitCharacterSupport {
 				if strings.Contains(config[len(config)/2], c) {
@@ -119,11 +123,11 @@ func main() {
 		switch {
 		case "A" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "Z", "0" <= phoneTypefirstCharacter && phoneTypefirstCharacter <= "9":
 			if err := writeLines(config, tftpOutPutPath+strings.ToUpper(phoneData[i][macAddress])+fileNameExtension); err != nil {
-				writeToLog("Writeconfigfile Error : " + err.Error())
+				writeToLog("Writeconfigfile Error : " + err.Error()+"\n")
 			}
 		default:
 			if err := writeLines(config, tftpOutPutPath+phoneData[i][macAddress]+fileNameExtension); err != nil {
-				writeToLog("Writeconfigfile Error : " + err.Error())
+				writeToLog("Writeconfigfile Error : " + err.Error()+"\n")
 			}
 		}
 	}
@@ -145,6 +149,7 @@ func covertExcelItemToArrayItem(s string) int {
 
 func getSupportPhoneTypes(path string) []string {
 	var phoneType []string
+	var runtimeerrbit int = 0
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Fatal(err)
@@ -152,11 +157,21 @@ func getSupportPhoneTypes(path string) []string {
 	for _, f := range files {
 		fName, err := os.Stat(path + f.Name())
 		if err != nil {
-			writeToLog(err.Error())
+			writeToLog(err.Error()+"\n")
 		}
 		if fName.Mode().IsDir() {
+			if !(strings.Contains(fName.Name(),".")){
+				writeToLog(" ERROR : The Direct  [ "+fName.Name()+" ]  not include file extensions")
+				runtimeerrbit ++
+			}else if strings.Join(strings.Split(fName.Name(), ".")[1:2], "") == ""{
+				writeToLog(" ERROR : The Direct  [ "+fName.Name()+" ]  file extensions is empty")
+				runtimeerrbit ++
+			}
 			phoneType = append(phoneType, fName.Name())
 		}
+	}
+	if runtimeerrbit > 0 {
+		os.Exit(0)
 	}
 	return phoneType
 }
@@ -176,7 +191,7 @@ func makeFormateRegular(phoneData [][]string, isMobile, isUseAutoProvisioning, u
 			}
 		}
 		if typeFound == false {
-			writeToLog("[The execl row '" + strconv.Itoa(i+3) + "']  phone type is  '" + phoneData[i][usePhoneType] + "'  the type not yet suppert so check The Phone Type\n [" + strconv.Itoa(i+3) + "] " + strings.Join(phoneData[i], " "))
+			writeToLog("[The execl row '" + strconv.Itoa(i+3) + "']  phone type is  '" + phoneData[i][usePhoneType] + "'  the type not yet suppert so check The Phone Type\n [" + strconv.Itoa(i+3) + "] " + strings.Join(phoneData[i], " ")+"\n")
 			phoneData[i][usePhoneType] = "unknowtype"
 		}
 	}
