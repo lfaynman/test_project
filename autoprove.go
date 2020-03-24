@@ -21,7 +21,7 @@ var splitCharacterSupport = []string{"=", ":"}
 var supportPhoneTypes []string
 
 func main() {
-	orignalTime := time.Now().Unix()
+	orignalTime := time.Now().UnixNano()
 	var wg sync.WaitGroup
 	var config, setPhone []string
 	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
@@ -127,7 +127,7 @@ func main() {
 	}()
 	wg.Wait()
 	writeToLog("Total " + strconv.Itoa(len(phoneData)) + "  Execel items maked.")
-	writeToLog("Total RunTime is  " + strconv.Itoa(int(time.Now().Unix()-orignalTime)) + "  sec.")
+	writeToLog("Total RunTime is  " + strconv.Itoa(int((time.Now().UnixNano()-orignalTime)/1000000)) + "  millisec.")
 }
 
 func covertExcelItemToArrayItem(s string) int {
