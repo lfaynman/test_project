@@ -18,10 +18,10 @@ const phoneSetPath string = "/usr/local/voip/ipphone/"
 
 var splitCharacterSupport = []string{"=", ":"}
 var supportPhoneTypes []string
-
 func main() {
 	orignalTime := time.Now().UnixNano()
 	var config, setPhone []string
+	var splitCharacter string
 	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
 	if err != nil {
 		writeToLog(err.Error() + "\n")
@@ -62,6 +62,12 @@ func main() {
 			for _, cline := range configlines {
 				config = append(config, cline)
 			}
+			for _, c := range splitCharacterSupport {
+				if strings.Contains(config[len(config)/2], c) {
+					splitCharacter = c
+					break
+				}
+			}
 			setPhone = setPhone[:0]
 			setPhonelines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/setphone")
 			if err != nil {
@@ -76,7 +82,7 @@ func main() {
 		}
 		for _, item := range setPhone {
 			var configTargetItem int
-			var phoneSetValue, splitCharacter string
+			var phoneSetValue string
 			setPhoneSearchString := strings.Join(strings.Split(item, ":")[:1], "")
 			setPhoneData := strings.Split(strings.Join(strings.Split(item, ":")[1:2], ""), ",")
 			for _, data := range setPhoneData {
@@ -97,12 +103,6 @@ func main() {
 			if typeFound == false {
 				writeToLog(phoneData[i][usePhoneType] + ": Searchstring  [ " + setPhoneSearchString + " ]  ; " + "The setPhone file has searched no mach with setphone item , check the item of setphone is correct\n")
 			}
-			for _, c := range splitCharacterSupport {
-				if strings.Contains(config[len(config)/2], c) {
-					splitCharacter = c
-					break
-				}
-			}
 			config[configTargetItem] = strings.Join(strings.SplitAfter(config[configTargetItem], splitCharacter)[:1], "") + phoneSetValue
 		}
 
@@ -120,7 +120,7 @@ func main() {
 		}
 	}
 	writeToLog("Total " + strconv.Itoa(len(phoneData)) + "  Execel items maked.")
-	writeToLog("Total RunTime is  " + strconv.Itoa(int((time.Now().UnixNano()-orignalTime)/1000000)) + "  millisec.")
+	writeToLog("Total RunTime is  " + strconv.Itoa(int((time.Now().UnixNano()-orignalTime)/1000000)) + "  millisecond .")
 }
 
 func covertExcelItemToArrayItem(s string) int {
