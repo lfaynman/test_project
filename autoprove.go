@@ -22,7 +22,7 @@ func main() {
 	orignalTime := time.Now().UnixNano()
 	var config, setPhone []string
 	var splitCharacter string
-	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $4}'`).Output()
+	path, err := exec.Command("/bin/sh", "-c", `/bin/cat /etc/xinetd.d/tftp |grep server_args|awk -F" " '{print $NF}'`).Output()
 	if err != nil {
 		writeToLog(err.Error() + "\n")
 		os.Exit(1)
