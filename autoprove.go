@@ -18,6 +18,7 @@ const phoneSetPath string = "/usr/local/voip/ipphone/"
 
 var splitCharacterSupport = []string{"=", ":"}
 var supportPhoneTypes []string
+
 func main() {
 	orignalTime := time.Now().UnixNano()
 	var config, setPhone []string
@@ -49,7 +50,7 @@ func main() {
 	supportPhoneTypes = getSupportPhoneTypes(phoneSetPath)
 	phoneData = makeFormateRegular(phoneData[2:], isMobile, isUseAutoProvisioning, usePhoneType, macAddress)
 
-	for i, _ := range phoneData {
+	for i := range phoneData {
 		if phoneData[i][usePhoneType] == "unknowtype" || phoneData[i][isUseAutoProvisioning] == "no" || phoneData[i][isMobile] == "yes" {
 			continue
 		}
@@ -58,6 +59,10 @@ func main() {
 			configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
 			if err != nil {
 				writeToLog(err.Error() + "\n")
+			}
+			if len(config) == 0 {
+				writeToLog(" Error :  config file or template is empty.  Can't read empty file " + phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate] + " \n" + "Check the data of line [" + strconv.Itoa(i+3) + "] : " + strings.Join(phoneData[i], " ") + "\n")
+				continue
 			}
 			for _, cline := range configlines {
 				config = append(config, cline)
@@ -170,7 +175,7 @@ func getSupportPhoneTypes(path string) []string {
 
 func makeFormateRegular(phoneData [][]string, isMobile, isUseAutoProvisioning, usePhoneType, macAddress int) [][]string {
 	replacer := strings.NewReplacer(":", "", "-", "")
-	for i, _ := range phoneData {
+	for i := range phoneData {
 		phoneData[i][macAddress] = strings.ToLower(replacer.Replace(phoneData[i][macAddress]))
 		phoneData[i][isMobile] = strings.ToLower(phoneData[i][isMobile])
 		phoneData[i][isUseAutoProvisioning] = strings.ToLower(phoneData[i][isUseAutoProvisioning])
