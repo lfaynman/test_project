@@ -56,12 +56,13 @@ func main() {
 		}
 		if i == 0 || phoneData[i][usePhoneType] != phoneData[i][usePhoneType-1] || phoneData[i][useSetPhoneTemplate] != phoneData[i][useSetPhoneTemplate-1] {
 			config = config[:0]
+			if phoneData[i][useSetPhoneTemplate] == "" {
+				writeToLog(" Error :  Execel column 'BA' empty [config file or template is empty.]  Can't read empty file " + phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate] + " \n" + "Check the data of line [" + strconv.Itoa(i+3) + "] : " + strings.Join(phoneData[i], " ") + "\n")
+				continue
+			}
 			configlines, err := readLines(phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate])
 			if err != nil {
 				writeToLog(err.Error() + "\n")
-			}
-			if len(config) == 0 {
-				writeToLog(" Error :  config file or template is empty.  Can't read empty file " + phoneSetPath + phoneData[i][usePhoneType] + "/" + phoneData[i][useSetPhoneTemplate] + " \n" + "Check the data of line [" + strconv.Itoa(i+3) + "] : " + strings.Join(phoneData[i], " ") + "\n")
 				continue
 			}
 			for _, cline := range configlines {
